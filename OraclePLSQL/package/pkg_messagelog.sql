@@ -18,6 +18,10 @@ as
                          p_msgtext_    in varchar2 default null,
                          p_paramvalue_ in varchar2 default null,
                          p_backtrace_  in varchar2 default null);
+                         
+  procedure p_insert_msgcode(p_msgcode    in varchar2,
+                             p_rusmsgtext in varchar2 default null,
+                             p_priority   in number default null);
 end pkg_msglog;
 /
 create or replace package body pkg_msglog 
@@ -89,4 +93,44 @@ as
 
     commit;
   end p_insert_log;
+  
+  procedure p_insert_msgcode(p_msgcode    in varchar2,
+                             p_rusmsgtext in varchar2 default null,
+                             p_priority   in number default null)
+  is 
+    v_msgcode messagecodes.msgcode%type;
+    v_rustext messagecodes.rustext%type;
+  begin
+    select rustext
+      into v_rustext
+      from messagecodes
+     where msgcode = trim(p_msgcode);
+    
+    if trim(upper(v_rustext)) != trim(upper(p_rusmsgtext)) then
+      update messagecodes
+         set rustext = trim(p_rusmsgtext),
+             lastupdate = sysdate
+       where msgcode = trim(p_msgcode);
+    end if;
+    
+    insert into messagecodes(msgcode,
+                             rustext,
+                             msgpriority,
+                             insertdate)
+    values(trim(upper(p_msgcode)),
+           trim(p_rusmsgtext),
+           p_priority,
+           sysdate);
+  exception
+    when no_data_found then
+      insert into messagecodes(msgcode,
+                               rustext,
+                               msgpriority,
+                               insertdate)
+      values(p_msgcode,
+             p_rusmsgtext,
+             p_priority,
+             sysdate);
+  end p_insert_msgcode;
+  
 end pkg_msglog;
