@@ -6,6 +6,12 @@ as
                       p_paramvalue in varchar2 default null,
                       p_backtrace  in varchar2 default null);
                       
+  procedure p_log_archerr(p_objname    in varchar2,
+                          p_msgcode    in varchar2,
+                          p_msgtext    in varchar2,
+                          p_paramvalue in varchar2,
+                          p_backtrace  in varchar2);
+                      
   procedure p_log_wrn(p_objname    in varchar2,
                       p_msgcode    in varchar2,
                       p_msgtext    in varchar2 default null,
@@ -22,10 +28,34 @@ as
   procedure p_insert_msgcode(p_msgcode    in varchar2,
                              p_rusmsgtext in varchar2 default null,
                              p_priority   in number default null);
+                             
+  -- function found architect error codes OR crete new code and return his
+  function f_get_archerrcode(p_obj_name in varchar2,
+                             p_err_code in number)
+    return varchar2;
+    
 end pkg_msglog;
 /
 create or replace package body pkg_msglog 
 as
+  -- create architectural error
+  procedure p_insert_arch_err(p_objname_    in varchar2,
+                              p_errcode_    in varchar2,
+                              p_msgcode_    in varchar2)
+  is
+    pragma autonomous_transaction;
+  begin
+    insert into messagecodes_arch(objectname,
+                                  sqlerrcode,
+                                  msgcode,
+                                  insertdate)
+      values(upper(p_objname_),
+             p_errcode_,
+             p_msgcode_,
+             sysdate);
+    commit;
+  end p_insert_arch_err;
+  
   procedure p_log_err(p_objname    in varchar2,
                       p_msgcode    in varchar2,
                       p_msgtext    in varchar2,
@@ -41,6 +71,31 @@ as
                  p_paramvalue_ => p_paramvalue,
                  p_backtrace_  => p_backtrace);
   end p_log_err;
+  
+  -- loggining architectural error
+  procedure p_log_archerr(p_objname    in varchar2,
+                          p_msgcode    in varchar2,
+                          p_msgtext    in varchar2,
+                          p_paramvalue in varchar2,
+                          p_backtrace  in varchar2)
+  is
+    v_sqlerrcode messagecodes_arch.sqlerrcode%type;
+    v_msgcode    messagecodes.msgcode%type;
+  begin
+    if pkg_util.is_number(p_msgcode) = 1 then 
+      v_msgcode := f_get_archerrcode(p_obj_name => upper(p_objname),
+                                     p_err_code => abs(p_msgcode));
+    else
+      v_msgcode := p_msgcode;
+    end if;
+    p_insert_log(p_msgtype_    => 'ERR',
+                 p_objname_    => p_objname,
+                 p_insertdate_ => sysdate,
+                 p_msgcode_    => v_msgcode,
+                 p_msgtext_    => p_msgtext,
+                 p_paramvalue_ => p_paramvalue,
+                 p_backtrace_  => p_backtrace);
+  end p_log_archerr;
   
   procedure p_log_wrn(p_objname    in varchar2,
                       p_msgcode    in varchar2,
@@ -133,4 +188,28 @@ as
              sysdate);
   end p_insert_msgcode;
   
+  function f_get_archerrcode(p_obj_name in varchar2,
+                             p_err_code in number)
+    return varchar2
+  is
+    v_err_prefix  varchar2(10) := 'SYS';       -- prefix architectural error
+    v_err_code    number := abs(p_err_code);
+    v_msgcode     messagecodes.msgcode%type; 
+    v_new_msgcode messagecodes.msgcode%type; 
+  begin
+    select msgcode
+      into v_msgcode
+      from messagecodes_arch
+     where objectname = upper(p_obj_name)
+       and sqlerrcode = v_err_code;
+    return v_msgcode;
+  exception
+    when no_data_found then
+      v_new_msgcode := v_err_prefix||lpad(seq_messagecodes_arch_id.nextval, 4, '0');
+      p_insert_arch_err(p_objname_ => upper(p_obj_name),
+                        p_errcode_ => v_err_code,
+                        p_msgcode_ => v_new_msgcode);
+     return v_new_msgcode;
+  end f_get_archerrcode;
+
 end pkg_msglog;
