@@ -1,4 +1,5 @@
 create table messagelog(id         number(38)     not null,
+                        sessionid  number(38)     not null,
                         msgtype    varchar2(3)    not null,
                         objname    varchar2(60)   default null,
                         insertdate date           default sysdate,

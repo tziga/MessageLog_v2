@@ -18,6 +18,7 @@ as
                       p_paramvalue in varchar2 default null);
 
   procedure p_insert_log(p_msgtype_    in varchar2,
+                         p_sessionid_  in number,
                          p_objname_    in varchar2,
                          p_insertdate_ in date,
                          p_msgcode_    in varchar2,
@@ -38,6 +39,8 @@ end pkg_msglog;
 /
 create or replace package body pkg_msglog 
 as
+  v_sid number;  -- unique SID current session
+  
   -- create architectural error
   procedure p_insert_arch_err(p_objname_    in varchar2,
                               p_errcode_    in varchar2,
@@ -64,6 +67,7 @@ as
   is
   begin
     p_insert_log(p_msgtype_    => 'ERR',
+                 p_sessionid_  => v_sid,
                  p_objname_    => p_objname,
                  p_insertdate_ => sysdate,
                  p_msgcode_    => p_msgcode,
@@ -89,6 +93,7 @@ as
       v_msgcode := p_msgcode;
     end if;
     p_insert_log(p_msgtype_    => 'ERR',
+                 p_sessionid_  => v_sid,
                  p_objname_    => p_objname,
                  p_insertdate_ => sysdate,
                  p_msgcode_    => v_msgcode,
@@ -104,6 +109,7 @@ as
   is
   begin
     p_insert_log(p_msgtype_    => 'WRN',
+                 p_sessionid_  => v_sid,
                  p_objname_    => p_objname,
                  p_insertdate_ => sysdate,
                  p_msgcode_    => p_msgcode,
@@ -113,6 +119,7 @@ as
   end p_log_wrn;
   
   procedure p_insert_log(p_msgtype_    in varchar2,
+                         p_sessionid_  in number,
                          p_objname_    in varchar2,
                          p_insertdate_ in date,
                          p_msgcode_    in varchar2,
@@ -124,19 +131,19 @@ as
     pragma autonomous_transaction;
   begin
     insert into messagelog(msgtype,
+                           sessionid,
                            objname,
                            insertdate,
                            msgcode,
                            msgtext,
-                           paramvalue,
-                           backtrace)
+                           paramvalue)
         values(p_msgtype_,
+               p_sessionid_,
                p_objname_,
                p_insertdate_,
                p_msgcode_,
                p_msgtext_,
-               p_paramvalue_,
-               p_backtrace_)
+               p_paramvalue_)
     return id
       into v_id;
     if trim(p_backtrace_) is not null then
@@ -212,4 +219,6 @@ as
      return v_new_msgcode;
   end f_get_archerrcode;
 
+begin
+  v_sid := SYS_CONTEXT('USERENV', 'SESSIONID');
 end pkg_msglog;
