@@ -34,6 +34,10 @@ as
   function f_get_archerrcode(p_obj_name in varchar2,
                              p_err_code in number)
     return varchar2;
+
+  function f_get_errcode(p_msgcode  in varchar2,
+                         p_msgparam in varchar2)
+    return varchar2;
     
 end pkg_msglog;
 /
@@ -160,29 +164,25 @@ as
                              p_rusmsgtext in varchar2 default null,
                              p_priority   in number default null)
   is 
-    v_msgcode messagecodes.msgcode%type;
-    v_rustext messagecodes.rustext%type;
+    v_objname     varchar2(60) := utl_call_stack.concatenate_subprogram(utl_call_stack.subprogram(1));
+    v_msgcode     messagecodes.msgcode%type;
+    v_rustext     messagecodes.rustext%type;
+    v_msgpriority messagecodes.msgpriority%type;
   begin
-    select rustext
-      into v_rustext
+    select rustext, 
+           msgpriority
+      into v_rustext,
+           v_msgpriority
       from messagecodes
      where msgcode = trim(p_msgcode);
     
-    if trim(upper(v_rustext)) != trim(upper(p_rusmsgtext)) then
+    if ((trim(upper(v_rustext)) != trim(upper(p_rusmsgtext))) or (trim(v_msgpriority) != trim(p_priority))) then
       update messagecodes
          set rustext = trim(p_rusmsgtext),
+             msgpriority = trim(p_priority),
              lastupdate = sysdate
        where msgcode = trim(p_msgcode);
     end if;
-    
-    insert into messagecodes(msgcode,
-                             rustext,
-                             msgpriority,
-                             insertdate)
-    values(trim(upper(p_msgcode)),
-           trim(p_rusmsgtext),
-           p_priority,
-           sysdate);
   exception
     when no_data_found then
       insert into messagecodes(msgcode,
@@ -193,6 +193,14 @@ as
              p_rusmsgtext,
              p_priority,
              sysdate);
+    when others then
+      pkg_msglog.p_log_archerr(p_objname    => v_objname,
+                               p_msgcode    => SQLCODE,
+                               p_msgtext    => SQLERRM,
+                               p_paramvalue => 'p_msgcode = '||p_msgcode
+                                                ||', p_rusmsgtext = '||p_rusmsgtext
+                                                ||', p_priority = '||to_char(p_priority),
+                               p_backtrace  => dbms_utility.format_error_backtrace);
   end p_insert_msgcode;
   
   function f_get_archerrcode(p_obj_name in varchar2,
@@ -218,6 +226,32 @@ as
                         p_msgcode_ => v_new_msgcode);
      return v_new_msgcode;
   end f_get_archerrcode;
+
+  function f_get_errcode(p_msgcode  in varchar2,
+                         p_msgparam in varchar2)
+    return varchar2
+  is
+    v_objname varchar2(60) := utl_call_stack.concatenate_subprogram(utl_call_stack.subprogram(1));
+    v_msgtext messagecodes.rustext%type;
+  begin
+    select rustext
+      into v_msgtext
+      from messagecodes
+     where msgcode = upper(p_msgcode);
+     
+    for i in (select rownum as rn,
+                     regexp_substr(p_msgparam, '[^;]+', 1, level) str
+                from dual
+             connect by instr(p_msgparam, ';', 1, level - 1) > 0)
+    loop
+      v_msgtext := replace(v_msgtext,'$'||i.rn,i.str);
+    end loop;
+    
+    return v_msgtext;
+  exception
+    when no_data_found then
+      return 'Для кода '||p_msgcode||' с параметрами '||p_msgparam||' не найдено описание';
+  end f_get_errcode;
 
 begin
   v_sid := SYS_CONTEXT('USERENV', 'SESSIONID');
