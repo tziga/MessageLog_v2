@@ -36,6 +36,7 @@
                                                     ||', p_param2 = '||p_param2
                                                     ||', p_param3 = '||to_char(p_param3,'dd.mm.yyyy hh24:mi:ss'),
                                  p_backtrace  => dbms_utility.format_error_backtrace);
+		raise;
     end;   
     
     /* others code */
@@ -56,5 +57,6 @@
                                                 ||', p_param2 = '||p_param2
                                                 ||', p_param3 = '||to_char(p_param3,'dd.mm.yyyy hh24:mi:ss'),
                                p_backtrace  => dbms_utility.format_error_backtrace);
+	 raise;
   end p_create_user;
   
