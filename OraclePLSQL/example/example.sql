@@ -79,7 +79,7 @@ as
                                                  ||', p_firstname_ = '||p_firstname_
                                                  ||', p_lastname_ = '||p_lastname_,
                                p_backtrace  => dbms_utility.format_error_backtrace);
-      rollback;
+	  raise;
   end p_insert_user;
   
   procedure p_create_user(p_login     in varchar2,
@@ -112,6 +112,7 @@ as
                                                 ||', p_firstname = '||p_firstname
                                                 ||', p_lastname = '||p_lastname,
                                p_backtrace  => dbms_utility.format_error_backtrace);
+	raise;
   end p_create_user;
   
   -- Демонстрационная процедура: по id пользователя вернет активынй (поле enddate = 5999 Год) номер телефона
@@ -151,5 +152,6 @@ as
                                p_msgtext    => SQLERRM,
                                p_paramvalue => 'p_userid = '||to_char(p_userid),
                                p_backtrace  => dbms_utility.format_error_backtrace);
+	 raise;
   end p_get_telnumber;
 end pkg_clients;
