@@ -11,7 +11,9 @@
                              p_errtext out varchar2)
   is
     v_objname varchar2(60) := utl_call_stack.concatenate_subprogram(utl_call_stack.subprogram(1));
-    /* others variable */
+    /* variable */
+    v_msgcode   messagelog.msgcode%type;
+    v_msgtext   messagelog.msgtext%type;
   begin
   
     /* others code */
@@ -22,12 +24,17 @@
       null;
     exception
       when no_data_found then
-        pkg_msglog.p_log_wrn(p_objname    => 'pkg_clients.p_insert_user',
-                             p_msgcode    => '101',
-                             p_msgtext    => 'Создан новый пользователь с id = '||v_id,
+        v_msgcode := 'USR0000'; -- внутренний код
+        v_msgtext := pkg_msglog.f_get_errcode(v_msgcode);
+        pkg_msglog.p_log_wrn(p_objname    => v_objname,
+                             p_msgcode    => v_msgcode,
+                             p_msgtext    => v_msgtext,
                              p_paramvalue => 'p_param1 = '||to_char(p_param1)
                                                 ||', p_param2 = '||p_param2
                                                 ||', p_param3 = '||to_char(p_param3,'dd.mm.yyyy hh24:mi:ss'));
+	  p_errcode := -1;
+      p_errtext := v_msgtext;
+    end;   
       when others then
         pkg_msglog.p_log_archerr(p_objname    => v_objname,
                                  p_msgcode    => SQLCODE,
@@ -40,15 +47,21 @@
     end;   
     
     /* others code */
-    
+    p_errcode := 1;
   exception
+      -- Пользовательское логирование
     when no_data_found or too_many_rows then
+      v_msgcode := 'USR0000';  -- внутренний код
+      v_msgtext := pkg_msglog.f_get_errcode(v_msgcode);
       pkg_msglog.p_log_wrn(p_objname    => v_objname,
-                           p_msgcode    => '101',
-                           p_msgtext    => 'Создан новый пользователь с id = '||v_id,
+                           p_msgcode    => v_msgcode,
+                           p_msgtext    => v_msgtext,
                            p_paramvalue => 'p_param1 = '||to_char(p_param1)
                                                 ||', p_param2 = '||p_param2
                                                 ||', p_param3 = '||to_char(p_param3,'dd.mm.yyyy hh24:mi:ss'));
+	  p_errcode := -1;
+      p_errtext := v_msgtext;
+    -- Архитектурное логирование
     when others then
       pkg_msglog.p_log_archerr(p_objname    => v_objname,
                                p_msgcode    => SQLCODE,
@@ -57,6 +70,6 @@
                                                 ||', p_param2 = '||p_param2
                                                 ||', p_param3 = '||to_char(p_param3,'dd.mm.yyyy hh24:mi:ss'),
                                p_backtrace  => dbms_utility.format_error_backtrace);
-	 raise;
+      raise;
   end p_create_user;
   
